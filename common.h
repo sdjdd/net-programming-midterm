@@ -11,3 +11,4 @@
 #define BUFFER_SIZE 1024
 
 void error(char *s, int status);
+size_t recvstr(int fd, char *buf, size_t buf_len);

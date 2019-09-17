@@ -1,6 +1,7 @@
 #include "common.h"
 #include <signal.h>
 #include <dirent.h>
+#include <unistd.h>
 
 int main(int argc, char **argv) {
     if (argc != 3) {
@@ -37,24 +38,59 @@ int main(int argc, char **argv) {
         }
         printf("client login\n");
 
-        char message[BUFFER_SIZE];
+        char buffer[BUFFER_SIZE];
         for (;;) {
             int n;
-            n = readline(connfd, message, BUFFER_SIZE);
+            n = recvstr(connfd, buffer, BUFFER_SIZE);
             if (n < 0) {
                 error("read", 1);
             } else if (n == 0) {
                 printf("client logout\n");
-                send(connfd, "bye~", 4, 0);
-                shutdown(connfd, SHUT_RDWR);
+                send(connfd, "bye~", 5, 0);
+                shutdown(connfd, SHUT_WR);
                 break;
             }
 
-            message[n - 1] = '\0';
-            printf("received: %s\n", message);
+            printf("received: %s\n", buffer);
 
-            n = send(connfd, message, n, 0);
-            if (n < 0) {
+            if (strcmp(buffer, "?") == 0) {
+                strcpy(buffer, "commands:\n pwd cd ls");
+            } else if (strcmp(buffer, "pwd") == 0) {
+                if (getcwd(buffer, BUFFER_SIZE) == NULL) {
+                    error("getcwd", 1);
+                }
+            } else if (strncmp(buffer, "cd", 2) == 0) {
+                if (strlen(buffer) <= 3) {
+                    strcpy(buffer, "usage: cd [path]");
+                } else if (chdir(buffer + 3) != 0) {
+                    strcpy(buffer, strerror(errno));
+                } else {
+                    continue;
+                }
+            } else if (strcmp(buffer, "ls") == 0) {
+                DIR *d;
+                struct dirent *dir;
+                d = opendir(".");
+                if (d == NULL) {
+                    error("opendir", 1);
+                }
+                char *p = buffer;
+                while ((dir = readdir(d)) != NULL) {
+                    strcpy(p, dir->d_name);
+                    p += dir->d_namlen;
+                    if (p - buffer >= BUFFER_SIZE - 1) {
+                        printf("ls too long\n");
+                        return 1;
+                    }
+                    *p++ = '\n';
+                }
+                *(p - 1) = 0;
+                closedir(d);
+            } else {
+                strcpy(buffer, "unknown command. type \"?\" to show all commands");
+            }
+
+            if (send(connfd, buffer, strlen(buffer) + 1, 0) < 0) {
                 error("send", 1);
             }
         }

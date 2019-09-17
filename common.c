@@ -5,7 +5,7 @@ void error(char *s, int status) {
     exit(status);
 }
 
-size_t read_msg(int fd, char *buf, size_t buf_len) {
+size_t recvstr(int fd, char *buf, size_t buf_len) {
     static char read_buf[4096];
     static char *p;
     int nleft = 0, count = 0;
@@ -24,8 +24,7 @@ size_t read_msg(int fd, char *buf, size_t buf_len) {
         }
         *buf = *p;
         ++count;
-        if (*buf == 3) {  // <ETX>
-            // *buf = 0;  // should process by caller
+        if (*buf == 0) {
             return count;
         }
         ++p;
@@ -35,15 +34,4 @@ size_t read_msg(int fd, char *buf, size_t buf_len) {
     }
 
     return -1;
-}
-
-size_t send_msg(int fd, char *buf, size_t buf_len) {
-    int len = strlen(buf);
-    if (buf[len - 1] == '\n') {
-        --len;
-    } else if (len < buf_len) {
-
-    }
-    buf[len - 1] = 3;
-    return send(fd, buf, len)
 }
